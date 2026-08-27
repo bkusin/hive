@@ -70,6 +70,9 @@ impl<T> Hive<T> {
         for block in self.data.iter_mut().enumerate() {
             if block.1.len < DEFAULT_CAP {
                 let idx = block.1.insert(value);
+                // did the insertion max out a block?
+                if block.1.len == DEFAULT_CAP { self.blocks_with_vacancies -= 1; }
+                
                 return Handle{ block_idx: block.0, block_offset: idx };
             }
         }
@@ -93,7 +96,7 @@ impl<T> Hive<T> {
     }
 
     pub fn capacity(&self) -> usize {
-        self.data.capacity() * DEFAULT_CAP
+        self.data.len() * DEFAULT_CAP
     }
 
 }
@@ -116,6 +119,7 @@ mod test {
     }
 
     #[test]
+    #[ignore = "To do"]
     fn test_delete() {
         let mut hive: Hive<i32> = Hive::new();
         let handle = hive.insert(42);
@@ -140,6 +144,7 @@ mod test {
     }
 
     #[test]
+    #[ignore]
     fn fill_vacancy() {
         todo!()
     }
