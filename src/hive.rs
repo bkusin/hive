@@ -4,6 +4,7 @@ use std::{
 
 const DEFAULT_CAP: usize = 16;
 
+#[derive(Copy, Clone)]
 struct Handle {
     block_idx: usize,
     block_offset: usize,
@@ -35,13 +36,53 @@ impl<T> Block<T> {
         }
         else {
             // either the block is completely empty or completely full
-            // the caller already checks the latter case
+            // the caller (hive) already checks the latter case
             0
         };
             
         self.data[index].write(value);
+        self.liveness[index] = true;
         self.len += 1;
+        
         index
+    }
+
+    fn remove(&mut self, index: usize) -> Option<T> {
+        if self.liveness[index] == false {
+            return None
+        }
+
+        self.liveness[index] = false;
+        self.free_list.push(index);
+        self.len -= 1;
+
+        // SAFETY: We already checked the liveness flag
+        // FIXME need to use assume_init_read() then assume_init_drop
+        unsafe {
+            Some(self.data[index].assume_init_read())
+        }
+    }
+
+    fn get(&self, index: usize) -> Option<&T> {
+        if self.liveness[index] == false {
+            return None
+        }
+
+        // SAFETY: we already checked the liveness
+        unsafe {
+            Some(self.data[index].assume_init_ref())
+        }
+    }
+
+    fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        if self.liveness[index] == false {
+            return None
+        }
+
+        // SAFETY: we already checked the liveness
+        unsafe {
+            Some(self.data[index].assume_init_mut())
+        }
     }
 }
 
@@ -80,10 +121,22 @@ impl<T> Hive<T> {
         unreachable!("Hive should always have a block with space");
     }
 
-    pub fn get(&self, handle: Handle) -> &T {
+    pub fn remove(&mut self, handle: Handle) -> Option<T> {
+        // SAFETY: hive doesn't delete or move blocks so block exists
+        self.data[handle.block_idx].remove(handle.block_offset)
+    }
+
+    pub fn get(&self, handle: Handle) -> Option<&T> {
+        // TODO deal with invalid handle, generation -> None
+        unsafe {
+            self.data[handle.block_idx].get(handle.block_offset)
+        }
+    }
+
+    pub fn get_mut(&mut self, handle: Handle) -> Option<&mut T> {
         // TODO deal with invalid handle, generation
         unsafe {
-            self.data[handle.block_idx].data[handle.block_offset].assume_init_ref()
+            self.data[handle.block_idx].get_mut(handle.block_offset)
         }
     }
 
@@ -115,18 +168,28 @@ mod test {
         let mut hive: Hive<i32> = Hive::new();
         let handle = hive.insert(42);
 
-        assert_eq!(*hive.get(handle), 42);
+        let result = *hive.get(handle).unwrap();
+
+        assert_eq!(result, 42);
+    }
+    
+    #[test]
+    fn test_mutate() {
+        let mut hive: Hive<i32> = Hive::new();
+        let handle = hive.insert(42);
+        let mutable = hive.get_mut(handle);
+        *mutable.unwrap() = 33;
+
+        assert_eq!(*hive.get(handle).unwrap(), 33);
     }
 
     #[test]
-    #[ignore = "To do"]
-    fn test_delete() {
+    fn test_remove() {
         let mut hive: Hive<i32> = Hive::new();
         let handle = hive.insert(42);
-        assert_eq!(hive.len(), 1);
+        hive.remove(handle);
 
-    //    hive.delete(handle);
-    //    assert_eq!(hive.len(), 0);
+        assert_eq!(hive.get(handle), None);
     }
 
     #[test]
