@@ -1,5 +1,5 @@
 use std::{
-    mem::{MaybeUninit, uninitialized}, ops::{Index, IndexMut},
+    mem::{MaybeUninit}
 };
 
 const DEFAULT_CAP: usize = 16;
@@ -11,6 +11,9 @@ struct Handle {
     // TODO: Generations
 }
 
+// auxiliary data is in its own structures for now
+// embedding it into slots could save memory or be more cache efficient
+// the liveness flags can be replaced with a bitfield or Matt Bentley's branchless method
 struct Block<T> {
     data: [MaybeUninit<T>; DEFAULT_CAP],
     len: usize,
@@ -57,7 +60,7 @@ impl<T> Block<T> {
         self.len -= 1;
 
         // SAFETY: We already checked the liveness flag
-        // FIXME need to use assume_init_read() then assume_init_drop
+        // we don't need to drop anything because this transfers ownership out of the Block
         unsafe {
             Some(self.data[index].assume_init_read())
         }
@@ -126,15 +129,19 @@ impl<T> Hive<T> {
         self.data[handle.block_idx].remove(handle.block_offset)
     }
 
+    // TODO: lifetime!
     pub fn get(&self, handle: Handle) -> Option<&T> {
         // TODO deal with invalid handle, generation -> None
+        // SAFETY: hive doesn't delete or move blocks so block exists
         unsafe {
             self.data[handle.block_idx].get(handle.block_offset)
         }
     }
 
+    // TODO: lifetime!
     pub fn get_mut(&mut self, handle: Handle) -> Option<&mut T> {
         // TODO deal with invalid handle, generation
+        // SAFETY: hive doesn't delete or move blocks so block exists
         unsafe {
             self.data[handle.block_idx].get_mut(handle.block_offset)
         }
@@ -152,7 +159,57 @@ impl<T> Hive<T> {
         self.data.len() * DEFAULT_CAP
     }
 
+    // TODO: Iterators. Study the Vec and Slotmap iterators, and look for general guidance on implementing them.
+    pub fn iter<'a>(&'a self) -> HiveIterator<'a, T> {
+        HiveIterator {
+            hive: self,
+            current: Handle { block_idx: 0, block_offset: 0 },
+         //   end: Handle { block_idx: self.data.len()-1, block_offset: self.data[len()-1].len()-1 },
+        }
+    } 
 }
+
+struct HiveIterator<'a, T> {
+    hive: &'a Hive<T>,
+    current: Handle,
+  //  end: Handle,
+}
+
+impl<'a, T> Iterator for HiveIterator<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+       while self.current.block_idx < self.hive.data.len() && self.current.block_offset < self.hive.data[self.current.block_idx].len {
+            
+            // skip holes
+            if self.hive.data[self.current.block_idx].liveness[self.current.block_offset] == false {
+                self.current.block_offset += 1;  
+                
+                // did we run off the block?
+                if self.current.block_offset == self.hive.data[self.current.block_idx].len {
+                    self.current.block_idx += 1;
+                    self.current.block_offset = 0;
+                    continue;
+                }
+            }
+            else {
+                let item = self.hive.get(self.current);
+                self.current.block_offset += 1;  
+                
+                // did we run off the block?
+                if self.current.block_offset == self.hive.data[self.current.block_idx].len {
+                    self.current.block_idx += 1;
+                    self.current.block_offset = 0;
+                }
+
+                return item
+            }
+       }
+
+       None
+    }
+}
+
 
 
 mod test {
@@ -193,22 +250,47 @@ mod test {
     }
 
     #[test]
+    fn test_remove_and_fill() {
+        let mut hive: Hive<i32> = Hive::new();
+        let handle = hive.insert(42);
+        hive.remove(handle);
+
+        // insertion after removing a single item should fill that same slot
+        hive.insert(33);
+
+        assert_eq!(*hive.get(handle).unwrap(), 33);
+    } 
+
+    #[test]
     fn test_expand() {
         let mut hive: Hive<i32> = Hive::new();
         for i in 0..18 {
             hive.insert(i as i32);
         }
 
-        // should access second block
+        // should have added a second block
         assert_eq!(hive.capacity(), 32);
         assert_eq!(hive.len(), 18);
-     //   assert_eq!(hive[17], 17);
-     //   assert_eq!(&hive.liveness[0..18], &[true; 18]);
     }
 
     #[test]
-    #[ignore]
-    fn fill_vacancy() {
+    fn test_iterator() {
+        let mut hive: Hive<i32> = Hive::new();
+        for i in 1..=3 {
+            hive.insert(i as i32);
+        }
+
+        for i in hive.iter() {
+            print!("{} ", i);
+        }
+
+        let v:Vec<i32>   = vec![1, 2, 3];
+        let v2: Vec<i32> = hive.iter().copied().collect();
+        assert_eq!(v, v2);
+    }
+
+    #[test]
+    fn test_iterator_with_holes() {
         todo!()
     }
 }
