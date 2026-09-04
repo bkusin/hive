@@ -17,6 +17,7 @@ struct Handle {
 struct Block<T> {
     data: [MaybeUninit<T>; DEFAULT_CAP],
     len: usize,
+    cap: usize,
     liveness: [bool; DEFAULT_CAP],
     free_list: Vec<usize>,         // stack of deleted slots
 }
@@ -32,6 +33,7 @@ impl<T> Block<T> {
         Self {
             data: [ const { MaybeUninit::uninit() }; DEFAULT_CAP],
             len: 0,
+            cap: DEFAULT_CAP,
             liveness: [false; DEFAULT_CAP],
             free_list: vacancies,
         }
@@ -185,35 +187,26 @@ impl<'a, T> Iterator for HiveIterator<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-       while self.current.block_idx < self.hive.data.len() && self.current.block_offset < self.hive.data[self.current.block_idx].len {
+       while self.current.block_idx < self.hive.data.len() && self.current.block_offset < self.hive.data[self.current.block_idx].cap {
             
-            // skip holes
-            if self.hive.data[self.current.block_idx].liveness[self.current.block_offset] == false {
-                self.current.block_offset += 1;  
-                
-                // did we run off the block?
-                if self.current.block_offset == self.hive.data[self.current.block_idx].len {
-                    self.current.block_idx += 1;
-                    self.current.block_offset = 0;
-                    continue;
-                }
-            }
-            else {
-                let item = self.hive.get(self.current);
-                self.current.block_offset += 1;  
-                
-                // did we run off the block?
-                if self.current.block_offset == self.hive.data[self.current.block_idx].len {
-                    self.current.block_idx += 1;
-                    self.current.block_offset = 0;
-                }
+            let item = self.hive.get(self.current);
 
-                return item
+            self.current.block_offset += 1;  
+                
+            // did we run off the block?
+            if self.current.block_offset == self.hive.data[self.current.block_idx].cap {
+                self.current.block_idx += 1;
+                self.current.block_offset = 0;
             }
+
+            if item.is_none() { continue; }  // skip hole
+            else { return item }
        }
 
        None
+       
     }
+    
 }
 
 
@@ -297,6 +290,20 @@ mod test {
 
     #[test]
     fn test_iterator_with_holes() {
-        todo!()
+        let mut hive: Hive<i32> = Hive::new();
+        hive.insert(1);
+        let handle = hive.insert(2);
+        hive.insert(3);
+        hive.insert(4);
+
+        hive.remove(handle);
+
+        for i in hive.iter() {
+            print!("{} ", i);   // should be 1,3,4
+        }
+
+        let v: Vec<i32>   = vec![1, 3, 4];
+        let v2: Vec<i32> = hive.iter().copied().collect();
+        assert_eq!(v, v2);
     }
 }
