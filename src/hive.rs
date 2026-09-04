@@ -137,7 +137,6 @@ impl<T> Hive<T> {
         self.data[handle.block_idx].remove(handle.block_offset)
     }
 
-    // TODO: lifetime!
     pub fn get(&self, handle: Handle) -> Option<&T> {
         // TODO deal with invalid handle, generation -> None
         // SAFETY: hive doesn't delete or move blocks so block exists
@@ -146,7 +145,6 @@ impl<T> Hive<T> {
         }
     }
 
-    // TODO: lifetime!
     pub fn get_mut(&mut self, handle: Handle) -> Option<&mut T> {
         // TODO deal with invalid handle, generation
         // SAFETY: hive doesn't delete or move blocks so block exists
@@ -167,7 +165,15 @@ impl<T> Hive<T> {
         self.data.len() * DEFAULT_CAP
     }
 
-    // TODO: more Iterators. 
+    pub fn drain() {
+        todo!()
+    }
+
+    pub fn retain() {
+        todo!()
+    }
+
+    // TODO: more Iterators - &mut and value (move) 
     pub fn iter<'a>(&'a self) -> HiveIterator<'a, T> {
         HiveIterator {
             hive: self,
@@ -175,6 +181,22 @@ impl<T> Hive<T> {
          //   end: Handle { block_idx: self.data.len()-1, block_offset: self.data[len()-1].len()-1 },
         }
     } 
+}
+
+impl<T> Drop for Hive<T> {
+    fn drop(&mut self) {
+
+        for block in self.data.iter_mut().enumerate() {
+            for i in 0..block.1.cap {
+                if block.1.liveness[i] == true {
+                    // SAFETY we're only dropping live things, which are always owned by the container
+                    unsafe {
+                        block.1.data[i].assume_init_drop();
+                    }
+                }
+            }
+        }
+    }
 }
 
 struct HiveIterator<'a, T> {
@@ -202,11 +224,8 @@ impl<'a, T> Iterator for HiveIterator<'a, T> {
             if item.is_none() { continue; }  // skip hole
             else { return item }
        }
-
        None
-       
     }
-    
 }
 
 
@@ -305,5 +324,16 @@ mod test {
         let v: Vec<i32>   = vec![1, 3, 4];
         let v2: Vec<i32> = hive.iter().copied().collect();
         assert_eq!(v, v2);
+    }
+    
+    #[test]
+    fn test_drop() {
+        let mut hive: Hive<String> = Hive::new();
+        let s = String::from("Hello");
+        
+        let handle = hive.insert(s);  // move string
+        
+        // TODO: verify that memory was freed, e.g. use MIRI
+        drop(hive);
     }
 }
