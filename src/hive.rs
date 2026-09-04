@@ -23,11 +23,17 @@ struct Block<T> {
 
 impl<T> Block<T> {
     fn new() -> Self {
+
+        let mut vacancies = Vec::with_capacity(DEFAULT_CAP);
+        for i in (0..DEFAULT_CAP).rev() {
+            vacancies.push(i);
+        }
+
         Self {
             data: [ const { MaybeUninit::uninit() }; DEFAULT_CAP],
             len: 0,
             liveness: [false; DEFAULT_CAP],
-            free_list: Vec::new(),
+            free_list: vacancies,
         }
     }
 
@@ -159,7 +165,7 @@ impl<T> Hive<T> {
         self.data.len() * DEFAULT_CAP
     }
 
-    // TODO: Iterators. Study the Vec and Slotmap iterators, and look for general guidance on implementing them.
+    // TODO: more Iterators. 
     pub fn iter<'a>(&'a self) -> HiveIterator<'a, T> {
         HiveIterator {
             hive: self,
