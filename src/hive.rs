@@ -169,8 +169,20 @@ impl<T> Hive<T> {
         todo!()
     }
 
-    pub fn retain() {
-        todo!()
+    pub fn retain<F>(&mut self, mut f: F)
+        where F: FnMut(&T) -> bool {
+            for mut block in &mut self.data {
+                for (index, item) in block.data.iter_mut().enumerate() {
+                    unsafe {
+                        if block.liveness[index] && !f(item.assume_init_ref()) {
+                            block.liveness[index] = false;
+                            block.len -= 1;
+                            block.free_list.push(index);
+                            item.assume_init_drop();
+                        }
+                    }
+                }
+            }
     }
 
     // TODO: more Iterators - &mut and value (move) 
@@ -335,5 +347,21 @@ mod test {
         
         // TODO: verify that memory was freed, e.g. use MIRI
         drop(hive);
+    }
+
+    #[test]
+    fn test_retain() {
+        let mut hive: Hive<i32> = Hive::new();
+        for i in 0..=10 {
+            hive.insert(i);
+        }
+
+        // retain even values
+        hive.retain(|x| { x % 2 == 0 });
+
+        assert_eq!(hive.len(), 5);
+        for item in hive.iter() {
+            assert_eq!(item % 2, 0);
+        }
     }
 }
