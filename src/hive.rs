@@ -169,9 +169,17 @@ impl<T> Hive<T> {
         todo!()
     }
 
+    pub fn clear(&mut self) {
+        self.retain(|x| { false });
+    }
+
+    pub fn shrink() {
+        todo!()
+    }
+
     pub fn retain<F>(&mut self, mut f: F)
         where F: FnMut(&T) -> bool {
-            for mut block in &mut self.data {
+            for block in &mut self.data {
                 for (index, item) in block.data.iter_mut().enumerate() {
                     unsafe {
                         if block.liveness[index] && !f(item.assume_init_ref()) {
@@ -363,5 +371,17 @@ mod test {
         for item in hive.iter() {
             assert_eq!(item % 2, 0);
         }
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut hive: Hive<i32> = Hive::new();
+        for i in 0..10 {
+            hive.insert(i);
+        }
+
+        hive.clear();
+
+        assert_eq!(hive.len(), 0);
     }
 }
