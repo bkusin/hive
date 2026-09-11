@@ -352,7 +352,7 @@ mod test {
     #[test]
     fn test_retain() {
         let mut hive: Hive<i32> = Hive::new();
-        for i in 0..=10 {
+        for i in 0..10 {
             hive.insert(i);
         }
 
