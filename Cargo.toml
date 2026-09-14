@@ -4,3 +4,10 @@ version = "0.1.1"
 edition = "2024"
 
 [dependencies]
+
+[dev-dependencies]
+criterion = "0.8.2"
+
+[[bench]]
+name = "benchmark"
+harness = false

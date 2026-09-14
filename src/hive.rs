@@ -5,7 +5,7 @@ use std::{
 const DEFAULT_CAP: usize = 16;
 
 #[derive(Copy, Clone)]
-struct Handle {
+pub struct Handle {
     block_idx: usize,
     block_offset: usize,
     // TODO: Generations
@@ -97,7 +97,7 @@ impl<T> Block<T> {
     }
 }
 
-struct Hive<T> {
+pub struct Hive<T> {
   //  block_size: usize,
     data: Vec<Box<Block<T>>>,
     blocks_with_vacancies: usize,
@@ -109,6 +109,10 @@ impl<T> Hive<T> {
            data: Vec::new(),
            blocks_with_vacancies: 0,
         }
+    }
+
+    pub fn with_capacity() -> Self {
+        todo!()
     }
 
     pub fn insert(&mut self, value: T) -> Handle {
@@ -173,10 +177,13 @@ impl<T> Hive<T> {
         self.retain(|x| { false });
     }
 
+    // drops the backing store 
+    // TODO: Need to consider reuse (e.g., Box::take) or reallocation, fixed or variable sized blocks, set at runtime vs compile time
     pub fn shrink() {
         todo!()
     }
 
+    // FIXME update blocks_with_vacancies
     pub fn retain<F>(&mut self, mut f: F)
         where F: FnMut(&T) -> bool {
             for block in &mut self.data {
