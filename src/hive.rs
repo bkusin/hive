@@ -226,7 +226,7 @@ impl<T> Drop for Hive<T> {
     }
 }
 
-struct HiveIterator<'a, T> {
+pub struct HiveIterator<'a, T> {
     hive: &'a Hive<T>,
     current: Handle,
   //  end: Handle,
