@@ -8,14 +8,14 @@ use hive::Hive;
 // TODO this benchmark is testing insertion of 16 items, not individual insertions. Fix!
 fn insert_benchmark(c: &mut Criterion) {
     let make_hive = || Hive::<u64>::new();
-    let insert_16 = |mut hive: Hive<u64>| {
-                            for i in 0..16 {
+    let insert = |mut hive: Hive<u64>| {
+                 //           for i in 0..16 {
                                 let _ = hive.insert(black_box(42));
-                            }
+                 //           }
                         };
 
     c.bench_function("insert", |b| {
-        b.iter_batched(make_hive, insert_16, BatchSize::SmallInput);
+        b.iter_batched(make_hive, insert, BatchSize::NumIterations(15));
     });
 }
 
