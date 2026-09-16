@@ -40,7 +40,7 @@ fn iter_benchmark(c: &mut Criterion) {
     // TODO this is suspciously fast; maybe the compiler is optimizing away things?
     // try to insert random data and delete random handles
     c.bench_function("iter", |b| {
-        b.iter(|| black_box( for _ in hive.iter(){}));
+        b.iter(|| black_box( hive.iter().count()));
     });
 
 }
@@ -72,9 +72,9 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
     // TODO this is suspciously fast; maybe the compiler is optimizing away things?
     // try to insert random data and delete random handles
     c.bench_function("iter", |b| {
-        b.iter(|| black_box( for _ in hive.iter(){}));
+        b.iter(|| black_box( hive.iter().count()));
     });
 }
 
-criterion_group!(benches, iter_benchmark);
+criterion_group!(benches, insert_benchmark);
 criterion_main!(benches);
