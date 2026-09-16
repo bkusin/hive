@@ -5,13 +5,11 @@ use random::*;
 
 use hive::Hive;
 
-// TODO this benchmark is testing insertion of 16 items, not individual insertions. Fix!
+// fill the first block only (avoid allocations)
 fn insert_benchmark(c: &mut Criterion) {
     let make_hive = || Hive::<u64>::new();
     let insert = |mut hive: Hive<u64>| {
-                 //           for i in 0..16 {
                                 let _ = hive.insert(black_box(42));
-                 //           }
                         };
 
     c.bench_function("insert", |b| {
@@ -37,8 +35,6 @@ fn iter_benchmark(c: &mut Criterion) {
         handles.push(hive.insert(source.read_u64()));
     }
 
-    // TODO this is suspciously fast; maybe the compiler is optimizing away things?
-    // try to insert random data and delete random handles
     c.bench_function("iter", |b| {
         b.iter(|| black_box( hive.iter().count()));
     });
@@ -60,7 +56,7 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
     // then take half the container and pass that to test closure that calls remove()
     for _ in 0..handles.len()*2 {
         let idx_1 = source.read_u64() as usize % handles.len();
-        let idx_2  = source.read_u64() as usize % handles.len(); 
+        let idx_2  = handles.len()-1; 
         handles.swap(idx_1, idx_2);
     }
 
@@ -69,8 +65,6 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
         hive.remove(handles[i]);
     }
 
-    // TODO this is suspciously fast; maybe the compiler is optimizing away things?
-    // try to insert random data and delete random handles
     c.bench_function("iter", |b| {
         b.iter(|| black_box( hive.iter().count()));
     });
