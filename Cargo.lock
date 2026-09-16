@@ -236,6 +236,7 @@ name = "hive"
 version = "0.1.1"
 dependencies = [
  "criterion",
+ "random",
 ]
 
 [[package]]
@@ -358,6 +359,12 @@ checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
 dependencies = [
  "proc-macro2",
 ]
+
+[[package]]
+name = "random"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d62d9cce151a97168445d78542558d3bddf6cf99f283c475f2eaf5cc14c364a"
 
 [[package]]
 name = "rayon"
