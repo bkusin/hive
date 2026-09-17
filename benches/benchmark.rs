@@ -5,6 +5,23 @@ use random::*;
 
 use hive::Hive;
 
+#[link(name = "AMDuProfileController")]
+unsafe extern "C"  {
+    #[link_name = "amdProfilePause"]
+    fn amd_profile_pause() -> i32;
+
+    #[link_name = "amdProfileResume"]
+    fn amd_profile_resume() -> i32;
+}
+
+fn profile_pause() {
+    unsafe { amd_profile_pause(); }
+}
+
+fn profile_resume() {
+    unsafe {amd_profile_resume(); }
+}
+
 // fill the first block only (avoid allocations)
 fn insert_benchmark(c: &mut Criterion) {
     let make_hive = || Hive::<u64>::new();
