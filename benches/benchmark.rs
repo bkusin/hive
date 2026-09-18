@@ -7,6 +7,7 @@ use random::*;
 
 use hive::Hive;
 
+#[cfg(feature = "profile")]
 #[link(name = "AMDProfileController", kind = "static")]
 unsafe extern "C"  {
     fn amdProfilePauseImpl() -> bool;
