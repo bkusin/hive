@@ -1,25 +1,67 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use core::time;
+use std::time::Instant;
 use std::hint::black_box;
 
 use random::*;
 
 use hive::Hive;
 
-#[link(name = "AMDuProfileController")]
+#[link(name = "AMDProfileController", kind = "static")]
 unsafe extern "C"  {
-    #[link_name = "amdProfilePause"]
-    fn amd_profile_pause() -> i32;
+    // #[link_name = "amdProfilePause"]
+    fn amdProfilePauseImpl() -> bool;
 
-    #[link_name = "amdProfileResume"]
-    fn amd_profile_resume() -> i32;
+    // #[link_name = "amdProfileResume"]
+    fn amdProfileResumeImpl() -> bool;
 }
 
 fn profile_pause() {
-    unsafe { amd_profile_pause(); }
+    unsafe { amdProfilePauseImpl(); }
 }
 
 fn profile_resume() {
-    unsafe {amd_profile_resume(); }
+    unsafe { amdProfileResumeImpl(); }
+}
+
+fn insert_benchmark_uprof(c: &mut Criterion) {
+    let make_hive = || Hive::<u64>::new();
+    let insert = |mut hive: Hive<u64>| {
+                                profile_resume();
+                                let _ = hive.insert(black_box(42));
+                                profile_pause();
+                        };
+
+    c.bench_function("insert", |b| {
+        let mut hive = Hive::new();
+        let handle = hive.insert(1); // allocate
+        hive.remove(handle);                 // doesn't deallocate when empty
+        b.iter_custom(move |iters| {
+            let insertion_chunks = iters / (hive.capacity() as u64);
+            let remainder = iters % (hive.capacity() as u64);
+            let capacity = hive.capacity();
+
+            let time = Instant::now();
+
+            for _ in 0..insertion_chunks {
+                profile_resume();
+                for _ in 0..capacity {
+                    hive.insert(42);
+                }
+                profile_pause();
+                hive.clear();
+            }
+
+            hive.clear();
+            profile_resume();
+            for _ in 0..remainder {
+                hive.insert(42);
+            }
+            profile_pause();
+
+            Instant::now() - time
+        })
+    });
 }
 
 // fill the first block only (avoid allocations)
@@ -87,5 +129,5 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, insert_benchmark);
+criterion_group!(benches, insert_benchmark_uprof);
 criterion_main!(benches);
