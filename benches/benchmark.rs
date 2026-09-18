@@ -9,20 +9,24 @@ use hive::Hive;
 
 #[link(name = "AMDProfileController", kind = "static")]
 unsafe extern "C"  {
-    // #[link_name = "amdProfilePause"]
     fn amdProfilePauseImpl() -> bool;
 
-    // #[link_name = "amdProfileResume"]
     fn amdProfileResumeImpl() -> bool;
 }
 
+#[cfg(feature = "profile")]
 fn profile_pause() {
     unsafe { amdProfilePauseImpl(); }
 }
-
+#[cfg(feature = "profile")]
 fn profile_resume() {
     unsafe { amdProfileResumeImpl(); }
 }
+
+#[cfg(not(feature = "profile"))]
+fn profile_resume() {}
+#[cfg(not(feature = "profile"))]
+fn profile_pause() {}
 
 fn insert_benchmark_uprof(c: &mut Criterion) {
     let make_hive = || Hive::<u64>::new();

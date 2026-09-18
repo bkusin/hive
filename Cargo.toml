@@ -12,3 +12,6 @@ random = "0.14.1"
 [[bench]]
 name = "benchmark"
 harness = false
+
+[features]
+profile =[]
