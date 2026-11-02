@@ -1,6 +1,8 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::hint::black_box;
 
+use std::path::Path;
+
 use random::*;
 
 use hive::Hive;
@@ -16,7 +18,7 @@ unsafe extern "C"  {
 pub struct AMDuProf;
 
 #[cfg(feature = "profile_uprof")]
-impl Profiler for AmduProf {
+impl Profiler for AMDuProf {
     fn start_profiling(&mut self, benchmark_id: &str, benchmark_dir: &Path) {
         unsafe { amdProfileResumeImpl(); }
     }
