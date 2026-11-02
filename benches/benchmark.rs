@@ -1,6 +1,4 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use core::time;
-use std::time::Instant;
 use std::hint::black_box;
 
 use random::*;
@@ -65,7 +63,7 @@ fn iter_benchmark(c: &mut Criterion) {
     let mut hive: Hive<u64> = Hive::new();
 
     let mut source = random::default(42);
-    for i in 0..16 {
+    for _ in 0..16 {
         handles.push(hive.insert(source.read_u64()));
     }
 
@@ -81,7 +79,7 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
 
     let mut source = random::default(42);
 
-    for i in 0..16 {
+    for _ in 0..16 {
         handles.push(hive.insert(source.read_u64()));
     }
 
