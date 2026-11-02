@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion, profiler::Profiler};
 use std::hint::black_box;
 
 use std::path::Path;
