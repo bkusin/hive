@@ -352,6 +352,17 @@ mod test {
         let v2: Vec<i32> = hive.iter().copied().collect();
         assert_eq!(v, v2);
     }
+
+    #[test]
+    fn test_iterator_across_blocks() {
+        let mut hive: Hive<i32> = Hive::new();
+        for value in 0..18 {
+            hive.insert(value);
+        }
+
+        let values: Vec<i32> = hive.iter().copied().collect();
+        assert_eq!(values, (0..18).collect::<Vec<_>>());
+    }
     
     #[test]
     fn test_drop() {
