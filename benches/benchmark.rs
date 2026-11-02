@@ -39,47 +39,6 @@ fn configure_criterion() -> Criterion {
     }
 }
 
-// this version of the insert_benchmark test is different because we don't want the profiler to capture the benchmark overhead itself
-fn insert_benchmark_uprof(c: &mut Criterion) {
-    let make_hive = || Hive::<u64>::new();
-    let insert = |mut hive: Hive<u64>| {
-                                profile_resume();
-                                let _ = hive.insert(black_box(42));
-                                profile_pause();
-                        };
-
-    c.bench_function("insert", |b| {
-        let mut hive = Hive::new();
-        let handle = hive.insert(1); // allocate
-        hive.remove(handle);                 // doesn't deallocate when empty
-        b.iter_custom(move |iters| {
-            let insertion_chunks = iters / (hive.capacity() as u64);
-            let remainder = iters % (hive.capacity() as u64);
-            let capacity = hive.capacity();
-
-            let time = Instant::now();
-
-            for _ in 0..insertion_chunks {
-                profile_resume();
-                for _ in 0..capacity {
-                    hive.insert(42);
-                }
-                profile_pause();
-                hive.clear();
-            }
-
-            hive.clear();
-            profile_resume();
-            for _ in 0..remainder {
-                hive.insert(42);
-            }
-            profile_pause();
-
-            Instant::now() - time
-        })
-    });
-}
-
 // fill the first block only (avoid allocations)
 fn insert_benchmark(c: &mut Criterion) {
     let make_hive = || Hive::<u64>::new();
@@ -147,5 +106,5 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
 
 criterion_group!(name = benches; 
                 config = configure_criterion();
-                targets = insert_benchmark_uprof);
+                targets = insert_benchmark);
 criterion_main!(benches);
