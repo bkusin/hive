@@ -14,4 +14,4 @@ name = "benchmark"
 harness = false
 
 [features]
-profile = []
+profile_uprof = []

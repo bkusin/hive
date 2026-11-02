@@ -7,28 +7,39 @@ use random::*;
 
 use hive::Hive;
 
-#[cfg(feature = "profile")]
+#[cfg(feature = "profile_uprof")]
 #[link(name = "AMDProfileController", kind = "static")]
 unsafe extern "C"  {
     fn amdProfilePauseImpl() -> bool;
 
     fn amdProfileResumeImpl() -> bool;
 }
+#[cfg(feature = "profile_uprof")]
+pub struct AMDuProf;
 
-#[cfg(feature = "profile")]
-fn profile_pause() {
-    unsafe { amdProfilePauseImpl(); }
+#[cfg(feature = "profile_uprof")]
+impl Profiler for AmduProf {
+    fn start_profiling(&mut self, benchmark_id: &str, benchmark_dir: &Path) {
+        unsafe { amdProfileResumeImpl(); }
+    }
+
+    fn stop_profiling(&mut self, benchmark_id: &str, benchmark_dir: &Path) {
+        unsafe { amdProfilePauseImpl(); }
+    }
 }
-#[cfg(feature = "profile")]
-fn profile_resume() {
-    unsafe { amdProfileResumeImpl(); }
+
+fn configure_criterion() -> Criterion {
+    let criterion = Criterion::default();
+
+    #[cfg(feature = "profile_uprof")] {
+        criterion.with_profiler(AMDuProf)
+    }
+    #[cfg(not(feature = "profile_uprof"))] {
+        criterion
+    }
 }
 
-#[cfg(not(feature = "profile"))]
-fn profile_resume() {}
-#[cfg(not(feature = "profile"))]
-fn profile_pause() {}
-
+// this version of the insert_benchmark test is different because we don't want the profiler to capture the benchmark overhead itself
 fn insert_benchmark_uprof(c: &mut Criterion) {
     let make_hive = || Hive::<u64>::new();
     let insert = |mut hive: Hive<u64>| {
@@ -134,5 +145,7 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, insert_benchmark_uprof);
+criterion_group!(name = benches; 
+                config = configure_criterion();
+                targets = insert_benchmark_uprof);
 criterion_main!(benches);
