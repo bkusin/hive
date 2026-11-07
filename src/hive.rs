@@ -15,26 +15,40 @@ pub struct Handle {
 // embedding it into slots could save memory or be more cache efficient
 // the liveness flags can be replaced with a bitfield or Matt Bentley's branchless method
 struct Block<T> {
-    data: [MaybeUninit<T>; DEFAULT_CAP],
+    data: Box<[MaybeUninit<T>]>,
     len: usize,
     cap: usize,
-    liveness: [bool; DEFAULT_CAP],
+    liveness: Box<[bool]>, 
     free_list: Vec<usize>,         // stack of deleted slots
 }
 
 impl<T> Block<T> {
+    // for fixed-size blocks of user-defined size, new() doesn't make much sense.
+    // Neither an empty container nor a default size make sense here.
+    #[cfg(any)]
     fn new() -> Self {
 
-        let mut vacancies = Vec::with_capacity(DEFAULT_CAP);
-        for i in (0..DEFAULT_CAP).rev() {
-            vacancies.push(i);
-        }
+        let mut vacancies = Vec::new();
 
         Self {
-            data: [ const { MaybeUninit::uninit() }; DEFAULT_CAP],
+            data: Box::new([MaybeUninit::<T>::uninit(); 0]),
             len: 0,
             cap: DEFAULT_CAP,
-            liveness: [false; DEFAULT_CAP],
+            liveness: Box::new([false; 0]),
+            free_list: vacancies,
+        }
+    }
+
+    fn with_block_capacity(capacity: usize) -> Self {
+        let vacancies = (0..capacity).rev().collect();
+        let liveness= Box::<[bool]>::new_zeroed_slice(capacity);
+        
+        Self {
+            data: Box::<[T]>::new_uninit_slice(capacity),
+            len: 0,
+            cap: capacity,
+            // SAFETY zero as construced above is valid for bool so the conversion is safe
+            liveness: unsafe { liveness.assume_init() },
             free_list: vacancies,
         }
     }

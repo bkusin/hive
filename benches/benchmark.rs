@@ -72,7 +72,6 @@ fn iter_benchmark(c: &mut Criterion) {
     c.bench_function("iter", |b| {
         b.iter(|| black_box( hive.iter().count()));
     });
-
 }
 
 fn iter_with_holes_benchmark(c: &mut Criterion) {
@@ -106,5 +105,5 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
 
 criterion_group!(name = benches; 
                 config = configure_criterion();
-                targets = insert_benchmark);
+                targets = iter_benchmark);
 criterion_main!(benches);
