@@ -38,10 +38,11 @@ fn configure_criterion() -> Criterion {
         criterion
     }
 }
+const DEFAULT_CAPACITY: usize = 256;
 
 // fill the first block only (avoid allocations)
 fn insert_benchmark(c: &mut Criterion) {
-    let make_hive = || Hive::<u64>::new();
+    let make_hive = || Hive::<u64>::with_block_capacity(DEFAULT_CAPACITY);
     let insert = |mut hive: Hive<u64>| {
                                 let _ = hive.insert(black_box(42));
                         };
@@ -52,7 +53,7 @@ fn insert_benchmark(c: &mut Criterion) {
 }
 
 fn get_benchmark(c: &mut Criterion) {
-    let mut hive: Hive<i32> = Hive::new();
+    let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);
     let handle = hive.insert(42);
 
     c.bench_function("get", |b| {
@@ -62,10 +63,10 @@ fn get_benchmark(c: &mut Criterion) {
 
 fn iter_benchmark(c: &mut Criterion) {
     let mut handles = Vec::new();
-    let mut hive: Hive<u64> = Hive::new();
+    let mut hive: Hive<u64> = Hive::with_block_capacity(DEFAULT_CAPACITY);
 
     let mut source = random::default(42);
-    for _ in 0..16 {
+    for _ in 0..DEFAULT_CAPACITY {
         handles.push(hive.insert(source.read_u64()));
     }
 
@@ -76,11 +77,11 @@ fn iter_benchmark(c: &mut Criterion) {
 
 fn iter_with_holes_benchmark(c: &mut Criterion) {
     let mut handles = Vec::new();
-    let mut hive: Hive<u64> = Hive::new();
+    let mut hive: Hive<u64> = Hive::with_block_capacity(DEFAULT_CAPACITY);
 
     let mut source = random::default(42);
 
-    for _ in 0..16 {
+    for _ in 0..DEFAULT_CAPACITY {
         handles.push(hive.insert(source.read_u64()));
     }
 
@@ -98,7 +99,7 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
         hive.remove(handles[i]);
     }
 
-    c.bench_function("iter", |b| {
+    c.bench_function("iter_with_holes", |b| {
         b.iter(|| black_box( hive.iter().count()));
     });
 }

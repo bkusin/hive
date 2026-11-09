@@ -39,7 +39,7 @@ impl<T> Block<T> {
         }
     }
 
-    fn with_block_capacity(capacity: usize) -> Self {
+    fn with_capacity(capacity: usize) -> Self {
         let vacancies = (0..capacity).rev().collect();
         let liveness= Box::<[bool]>::new_zeroed_slice(capacity);
         
@@ -112,36 +112,44 @@ impl<T> Block<T> {
 }
 
 pub struct Hive<T> {
-  //  block_size: usize,
-    data: Vec<Box<Block<T>>>,
+    block_capacity: usize,
+    data: Vec<Box<Block<T>>>,  // TODO don't need Box
     blocks_with_vacancies: usize,
 }
 
 impl<T> Hive<T> {
+    // for fixed-size blocks of user-defined size, new() doesn't make much sense.
+    // Neither an empty container nor a default size make sense here.
+    #[cfg(any)]
     pub fn new() -> Self {
         Self {
+           block_size: 0, 
            data: Vec::new(),
            blocks_with_vacancies: 0,
         }
     }
 
-    pub fn with_capacity() -> Self {
-        todo!()
+    pub fn with_block_capacity(capacity: usize) -> Self {
+        Self {
+            block_capacity: capacity,
+            data:Vec::new(),
+            blocks_with_vacancies: 0,
+        }
     }
 
     pub fn insert(&mut self, value: T) -> Handle {
         // if there are no blocks with vacancies, create a new block
         if self.blocks_with_vacancies == 0 {
-            self.data.push(Box::new(Block::<T>::new()));
+            self.data.push(Box::new(Block::<T>::with_capacity(self.block_capacity)));
             self.blocks_with_vacancies = 1;
         }
     
         // look for a block to insert into
         for block in self.data.iter_mut().enumerate() {
-            if block.1.len < DEFAULT_CAP {
+            if block.1.len < self.block_capacity {
                 let idx = block.1.insert(value);
                 // did the insertion max out a block?
-                if block.1.len == DEFAULT_CAP { self.blocks_with_vacancies -= 1; }
+                if block.1.len == self.block_capacity { self.blocks_with_vacancies -= 1; }
                 
                 return Handle{ block_idx: block.0, block_offset: idx };
             }
@@ -180,7 +188,7 @@ impl<T> Hive<T> {
     }
 
     pub fn capacity(&self) -> usize {
-        self.data.len() * DEFAULT_CAP
+        self.data.len() * self.block_capacity
     }
 
     pub fn drain() {
@@ -273,15 +281,20 @@ impl<'a, T> Iterator for HiveIterator<'a, T> {
 
 mod test {
     use super::*;
+    const DEFAULT_CAPACITY: usize = 256;
 
     #[test]
-    fn test_new() {
-        let hive: Hive<i32> = Hive::new();
+    fn create_with_capacity() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);
+        assert_eq!(hive.capacity(), 0);
+
+        hive.insert(42);
+        assert_eq!(hive.capacity(), DEFAULT_CAPACITY);
     }
 
     #[test]
-    fn test_insert() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn insert() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);
         let handle = hive.insert(42);
 
         let result = *hive.get(handle).unwrap();
@@ -290,8 +303,8 @@ mod test {
     }
     
     #[test]
-    fn test_mutate() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn mutate() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);
         let handle = hive.insert(42);
         let mutable = hive.get_mut(handle);
         *mutable.unwrap() = 33;
@@ -300,8 +313,8 @@ mod test {
     }
 
     #[test]
-    fn test_remove() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn remove() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);
         let handle = hive.insert(42);
         hive.remove(handle);
 
@@ -309,8 +322,8 @@ mod test {
     }
 
     #[test]
-    fn test_remove_and_fill() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn remove_and_refill() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);
         let handle = hive.insert(42);
         hive.remove(handle);
 
@@ -321,8 +334,8 @@ mod test {
     } 
 
     #[test]
-    fn test_expand() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn expand_hive() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(16);;
         for i in 0..18 {
             hive.insert(i as i32);
         }
@@ -333,8 +346,8 @@ mod test {
     }
 
     #[test]
-    fn test_iterator() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn iterate() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);
         for i in 1..=3 {
             hive.insert(i as i32);
         }
@@ -349,8 +362,8 @@ mod test {
     }
 
     #[test]
-    fn test_iterator_with_holes() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn iterate_with_holes() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);;
         hive.insert(1);
         let handle = hive.insert(2);
         hive.insert(3);
@@ -368,8 +381,8 @@ mod test {
     }
 
     #[test]
-    fn test_iterator_across_blocks() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn iterate_across_blocks() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(16);;
         for value in 0..18 {
             hive.insert(value);
         }
@@ -379,19 +392,19 @@ mod test {
     }
     
     #[test]
-    fn test_drop() {
-        let mut hive: Hive<String> = Hive::new();
+    fn drop() {
+        let mut hive: Hive<String> = Hive::with_block_capacity(DEFAULT_CAPACITY);;
         let s = String::from("Hello");
         
-        let handle = hive.insert(s);  // move string
+        hive.insert(s);  // move string
         
         // TODO: verify that memory was freed, e.g. use MIRI
-        drop(hive);
+        std::mem::drop(hive);
     }
 
     #[test]
-    fn test_retain() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn retain() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);;
         for i in 0..10 {
             hive.insert(i);
         }
@@ -406,8 +419,8 @@ mod test {
     }
 
     #[test]
-    fn test_clear() {
-        let mut hive: Hive<i32> = Hive::new();
+    fn clear() {
+        let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);;
         for i in 0..10 {
             hive.insert(i);
         }
