@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion, profiler::Profiler};
+use criterion::{BatchSize::{self, SmallInput}, Criterion, criterion_group, criterion_main, profiler::Profiler};
 use std::hint::black_box;
 
 use std::path::Path;
@@ -42,22 +42,52 @@ const DEFAULT_CAPACITY: usize = 256;
 
 // fill the first block only (avoid allocations)
 fn insert_benchmark(c: &mut Criterion) {
-    let make_hive = || Hive::<u64>::with_block_capacity(DEFAULT_CAPACITY);
+
+    // make a hive with one full block less one slot (so insertion doesn't trigger a new block allocation)
+    let make_hive = || { 
+        let mut hive = Hive::<u64>::with_block_capacity(DEFAULT_CAPACITY);
+        
+        let handle = hive.insert(0); 
+        for _ in 1..DEFAULT_CAPACITY {
+            hive.insert(0);
+        }
+
+        hive.remove(handle);
+        hive
+    };
+    
+    
     let insert = |mut hive: Hive<u64>| {
-                                let _ = hive.insert(black_box(42));
+                                black_box(hive.insert(black_box(42)));
                         };
 
     c.bench_function("insert", |b| {
-        b.iter_batched(make_hive, insert, BatchSize::NumIterations(15));
+        b.iter_batched(make_hive, insert, BatchSize::SmallInput);
     });
 }
 
 fn get_benchmark(c: &mut Criterion) {
-    let mut hive: Hive<i32> = Hive::with_block_capacity(DEFAULT_CAPACITY);
+    let mut hive: Hive<u64> = Hive::with_block_capacity(DEFAULT_CAPACITY);
     let handle = hive.insert(42);
 
     c.bench_function("get", |b| {
         b.iter(black_box(|| hive.get(black_box(handle))));
+    });
+}
+
+fn remove_benchmark(c: &mut Criterion) {
+    let make_hive= || { 
+        let mut hive = Hive::<u64>::with_block_capacity(DEFAULT_CAPACITY); 
+        let handle = hive.insert(42);
+        (hive, handle)
+    };
+
+    c.bench_function("remove", |b| {
+        b.iter_batched(
+            make_hive,
+            |(mut hive, handle)| black_box(hive.remove(black_box(handle))),
+            BatchSize::SmallInput,
+        );
     });
 }
 

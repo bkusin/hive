@@ -1,2 +1,2 @@
 pub mod hive;
-pub use hive::Hive;
+pub use hive::{Handle, Hive};
