@@ -38,7 +38,10 @@ fn configure_criterion() -> Criterion {
         criterion
     }
 }
-const DEFAULT_CAPACITY: usize = 256;
+
+// about 4 KB block data with i32 elements
+// additional memory overhead depends on implementation
+const DEFAULT_CAPACITY: usize = 1024;
 
 // fill the first block only (avoid allocations)
 fn insert_benchmark(c: &mut Criterion) {
@@ -71,7 +74,7 @@ fn get_benchmark(c: &mut Criterion) {
     let handle = hive.insert(42);
 
     c.bench_function("get", |b| {
-        b.iter(black_box(|| hive.get(black_box(handle))));
+        b.iter(|| black_box(hive.get(black_box(handle))));
     });
 }
 
@@ -92,16 +95,28 @@ fn remove_benchmark(c: &mut Criterion) {
 }
 
 fn iter_benchmark(c: &mut Criterion) {
-    let mut handles = Vec::new();
     let mut hive: Hive<u64> = Hive::with_block_capacity(DEFAULT_CAPACITY);
 
     let mut source = random::default(42);
     for _ in 0..DEFAULT_CAPACITY {
-        handles.push(hive.insert(source.read_u64()));
+        hive.insert(source.read_u64());
     }
 
-    c.bench_function("iter", |b| {
-        b.iter(|| black_box( hive.iter().count()));
+    c.bench_function("iter_full", |b| {
+        b.iter(|| black_box(&hive).iter().for_each(|item| { black_box(item); }));
+    });
+}
+
+fn iter_half_benchmark(c: &mut Criterion) {
+    let mut hive: Hive<u64> = Hive::with_block_capacity(DEFAULT_CAPACITY);
+
+    let mut source = random::default(42);
+    for _ in 0..DEFAULT_CAPACITY/2 {
+        hive.insert(source.read_u64());
+    }
+
+    c.bench_function("iter_half", |b| {
+        b.iter(|| black_box(&hive).iter().for_each(|item| { black_box(item); }));
     });
 }
 
@@ -125,16 +140,20 @@ fn iter_with_holes_benchmark(c: &mut Criterion) {
     }
 
     handles.truncate(handles.len() / 2);
-    for i in 0.. (handles.len() / 2) {
-        hive.remove(handles[i]);
+    for handle in &handles {
+        hive.remove(*handle);
     }
 
     c.bench_function("iter_with_holes", |b| {
-        b.iter(|| black_box( hive.iter().count()));
+        b.iter(|| black_box(&hive).iter().for_each(|item| { black_box(item); }));
     });
 }
 
-criterion_group!(name = benches; 
+criterion_group!(name = container_benches; 
                 config = configure_criterion();
-                targets = iter_benchmark);
-criterion_main!(benches);
+                targets = insert_benchmark, get_benchmark, remove_benchmark);
+
+criterion_group!(name = iter_benches;
+                 config = configure_criterion();
+                targets = iter_benchmark, iter_half_benchmark, iter_with_holes_benchmark);
+criterion_main!(container_benches, iter_benches);
